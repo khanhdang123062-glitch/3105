@@ -14,19 +14,19 @@ struct ContentView: View {
         let arguments = ProcessInfo.processInfo.arguments
         let initialTab: Int
         if arguments.contains("--simulate-files-tab") {
-            initialTab = 1
+            initialTab = AppSection.files.rawValue
         } else if arguments.contains("--simulate-patch-tab") {
-            initialTab = 2
+            initialTab = AppSection.patches.rawValue
         } else if arguments.contains("--simulate-cleaner-tab") {
-            initialTab = 3
+            initialTab = AppSection.cleaner.rawValue
         } else if arguments.contains("--simulate-wallpaper-tab") {
-            initialTab = 4
+            initialTab = AppSection.wallpapers.rawValue
         } else {
             initialTab = 0
         }
-        _tabNavigation = State(initialValue: AppTabNavigationState(selectedTab: AppSection.patches.rawValue))
+        _tabNavigation = State(initialValue: AppTabNavigationState(selectedTab: initialTab))
 #else
-        _tabNavigation = State(initialValue: AppTabNavigationState(selectedTab: AppSection.patches.rawValue))
+        _tabNavigation = State(initialValue: AppTabNavigationState())
 #endif
     }
 
@@ -115,10 +115,10 @@ struct ContentView: View {
                 wallpapersEnabled: $wallpapersEnabled,
                 wallpapersSupported: wallpapersSupported
             )
+        case .apps:
+            AppGridView()
         case .files:
-            AppDataBrowserView(
-                tabSession: filesTabSession
-            )
+            AppDataBrowserView(tabSession: filesTabSession)
         case .patches:
             PatchProjectsView()
         case .cleaner:
@@ -157,7 +157,7 @@ struct ContentView: View {
     private var selectedVisibleSection: AppSection {
         guard let section = AppSection(rawValue: tabNavigation.selectedTab),
               featureVisibility.isVisible(section) else {
-            return .patches
+            return .home
         }
         return section
     }
@@ -186,6 +186,7 @@ private extension AppSection {
     var titleKey: String {
         switch self {
         case .home: return "tab.home"
+        case .apps: return "tab.apps"
         case .files: return "tab.files"
         case .patches: return "tab.patches"
         case .cleaner: return "tab.cleaner"
@@ -196,6 +197,7 @@ private extension AppSection {
     var systemImage: String {
         switch self {
         case .home: return "house.fill"
+        case .apps: return "square.grid.2x2.fill"
         case .files: return "folder.fill"
         case .patches: return "shippingbox.fill"
         case .cleaner: return "sparkles"
@@ -260,20 +262,17 @@ private struct DashboardView: View {
     private var deviceSection: some View {
         Section {
             LabeledContent(language.text("dashboard.hardware_model")) {
-                Text(AppInfo.displayMachineName)
-                    .font(.body.monospaced())
+                Text(AppInfo.displayMachineName).font(.body.monospaced())
             }
             LabeledContent(language.text("settings.ios_version")) {
-                Text("\(AppInfo.osVersion) (\(AppInfo.osBuild))")
-                    .font(.body.monospaced())
+                Text("\(AppInfo.osVersion) (\(AppInfo.osBuild))").font(.body.monospaced())
             }
             HStack {
                 Text(language.text("settings.compatibility"))
                 Spacer()
                 Text(language.text(appState.isSupported ? "settings.supported" : "settings.unsupported"))
-                .foregroundStyle(appState.isSupported ? Color.green : Color.red)
+                    .foregroundStyle(appState.isSupported ? Color.green : Color.red)
             }
-
             if appState.kernelExploitApplicable && AppInfo.versionTuple.major < 26 {
                 HStack {
                     Text(language.text("dashboard.kernel_status"))
@@ -287,7 +286,7 @@ private struct DashboardView: View {
                         }
                     } else {
                         Text(language.text(appState.exploitStatus.isSuccess ? "dashboard.kernel_active" : "dashboard.kernel_inactive"))
-                        .foregroundStyle(appState.exploitStatus.isSuccess ? Color.green : Color.secondary)
+                            .foregroundStyle(appState.exploitStatus.isSuccess ? Color.green : Color.secondary)
                     }
                 }
             }
