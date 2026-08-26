@@ -2,11 +2,10 @@ import Foundation
 
 enum AppSection: Int, CaseIterable, Identifiable {
     case home
-    case new
-    case sources
-    case installed
     case files
-    case search
+    case patches
+    case cleaner
+    case wallpapers
 
     var id: Int { rawValue }
 }
@@ -22,24 +21,22 @@ enum WallpaperFeatureSupportPolicy {
     }
 }
 
-struct OneShotPresentationGate: Equatable {
-    private(set) var hasClaimed = false
-
-    mutating func claim() -> Bool {
-        guard !hasClaimed else { return false }
-        hasClaimed = true
-        return true
-    }
-}
-
 struct FeatureVisibility: Equatable {
     static let cleanerStorageKey = "feature.cleaner.enabled"
-    static let developerModeStorageKey = "feature.developer_mode.enabled"
+    static let wallpapersStorageKey = "feature.wallpapers.enabled"
 
-    let developerModeEnabled: Bool
+    let cleanerEnabled: Bool
+    let wallpapersEnabled: Bool
+    let wallpapersSupported: Bool
 
-    init(developerModeEnabled: Bool) {
-        self.developerModeEnabled = developerModeEnabled
+    init(
+        cleanerEnabled: Bool,
+        wallpapersEnabled: Bool,
+        wallpapersSupported: Bool = true
+    ) {
+        self.cleanerEnabled = cleanerEnabled
+        self.wallpapersEnabled = wallpapersEnabled
+        self.wallpapersSupported = wallpapersSupported
     }
 
     var visibleSections: [AppSection] {
@@ -48,10 +45,12 @@ struct FeatureVisibility: Equatable {
 
     func isVisible(_ section: AppSection) -> Bool {
         switch section {
-        case .files:
-            return developerModeEnabled
-        default:
+        case .patches:
             return true
+        case .wallpapers:
+            return wallpapersEnabled && wallpapersSupported
+        case .home, .files, .cleaner:
+            return false
         }
     }
 }
@@ -89,7 +88,7 @@ struct AppTabNavigationState: Equatable {
     mutating func reconcileSelection(with visibility: FeatureVisibility) {
         guard let selectedSection = AppSection(rawValue: selectedTab),
               visibility.isVisible(selectedSection) else {
-            selectedTab = AppSection.home.rawValue
+            selectedTab = AppSection.patches.rawValue
             return
         }
     }
@@ -129,17 +128,9 @@ struct FilesTabSession: Equatable {
         tabs.first { $0.id == selectedTabID }
     }
 
-    func navigationPath(for id: UUID) -> [FileBrowserDestination] {
-        tabs.first { $0.id == id }?.navigationPath ?? []
-    }
-
-    mutating func setNavigationPath(_ path: [FileBrowserDestination], for id: UUID) {
-        guard let index = tabs.firstIndex(where: { $0.id == id }) else { return }
-        tabs[index].navigationPath = path
-    }
-
     mutating func setActiveNavigationPath(_ path: [FileBrowserDestination]) {
-        setNavigationPath(path, for: selectedTabID)
+        guard let index = tabs.firstIndex(where: { $0.id == selectedTabID }) else { return }
+        tabs[index].navigationPath = path
     }
 
     mutating func openTab(
@@ -168,7 +159,6 @@ struct FilesTabSession: Equatable {
             selectedTabID = replacementID
             return
         }
-
         tabs.remove(at: index)
         if selectedTabID == id {
             selectedTabID = tabs[min(index, tabs.count - 1)].id
