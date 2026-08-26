@@ -2,8 +2,9 @@ import Foundation
 
 enum AppSection: Int, CaseIterable, Identifiable {
     case home
-    case files
+    case apps
     case patches
+    case files
     case cleaner
     case wallpapers
 
@@ -13,10 +14,8 @@ enum AppSection: Int, CaseIterable, Identifiable {
 enum WallpaperFeatureSupportPolicy {
     static func isSupported(major: Int) -> Bool {
         switch major {
-        case 17, 18, 26, 27:
-            return true
-        default:
-            return false
+        case 17, 18, 26, 27: return true
+        default: return false
         }
     }
 }
@@ -29,11 +28,7 @@ struct FeatureVisibility: Equatable {
     let wallpapersEnabled: Bool
     let wallpapersSupported: Bool
 
-    init(
-        cleanerEnabled: Bool,
-        wallpapersEnabled: Bool,
-        wallpapersSupported: Bool = true
-    ) {
+    init(cleanerEnabled: Bool, wallpapersEnabled: Bool, wallpapersSupported: Bool = true) {
         self.cleanerEnabled = cleanerEnabled
         self.wallpapersEnabled = wallpapersEnabled
         self.wallpapersSupported = wallpapersSupported
@@ -45,12 +40,12 @@ struct FeatureVisibility: Equatable {
 
     func isVisible(_ section: AppSection) -> Bool {
         switch section {
-        case .patches:
-            return true
-        case .wallpapers:
-            return wallpapersEnabled && wallpapersSupported
-        case .home, .files, .cleaner:
-            return false
+        case .home: return true
+        case .apps: return true
+        case .patches: return true
+        case .files: return true
+        case .cleaner: return cleanerEnabled
+        case .wallpapers: return wallpapersEnabled && wallpapersSupported
         }
     }
 }
@@ -59,36 +54,27 @@ struct AppTabNavigationState: Equatable {
     private(set) var selectedTab: Int
     private(set) var filesTabs: FilesTabSession
 
-    init(
-        selectedTab: Int = 0,
-        filesNavigationPath: [FileBrowserDestination] = []
-    ) {
+    init(selectedTab: Int = 0, filesNavigationPath: [FileBrowserDestination] = []) {
         self.selectedTab = selectedTab
         var session = FilesTabSession()
         session.setActiveNavigationPath(filesNavigationPath)
         filesTabs = session
     }
 
-    mutating func select(_ tab: Int) {
-        selectedTab = tab
-    }
+    mutating func select(_ tab: Int) { selectedTab = tab }
 
     mutating func setFilesNavigationPath(_ path: [FileBrowserDestination]) {
         filesTabs.setActiveNavigationPath(path)
     }
 
-    var filesNavigationPath: [FileBrowserDestination] {
-        filesTabs.activeTab?.navigationPath ?? []
-    }
+    var filesNavigationPath: [FileBrowserDestination] { filesTabs.activeTab?.navigationPath ?? [] }
 
-    mutating func setFilesTabs(_ session: FilesTabSession) {
-        filesTabs = session
-    }
+    mutating func setFilesTabs(_ session: FilesTabSession) { filesTabs = session }
 
     mutating func reconcileSelection(with visibility: FeatureVisibility) {
         guard let selectedSection = AppSection(rawValue: selectedTab),
               visibility.isVisible(selectedSection) else {
-            selectedTab = AppSection.patches.rawValue
+            selectedTab = AppSection.home.rawValue
             return
         }
     }
@@ -110,9 +96,7 @@ struct FilesTabState: Identifiable, Equatable {
         customTitle ?? navigationPath.last?.title ?? defaultTitle
     }
 
-    var currentPath: String? {
-        navigationPath.last?.startPath
-    }
+    var currentPath: String? { navigationPath.last?.startPath }
 }
 
 struct FilesTabSession: Equatable {
@@ -124,19 +108,14 @@ struct FilesTabSession: Equatable {
         selectedTabID = initialTabID
     }
 
-    var activeTab: FilesTabState? {
-        tabs.first { $0.id == selectedTabID }
-    }
+    var activeTab: FilesTabState? { tabs.first { $0.id == selectedTabID } }
 
     mutating func setActiveNavigationPath(_ path: [FileBrowserDestination]) {
         guard let index = tabs.firstIndex(where: { $0.id == selectedTabID }) else { return }
         tabs[index].navigationPath = path
     }
 
-    mutating func openTab(
-        id: UUID = UUID(),
-        navigationPath: [FileBrowserDestination] = []
-    ) {
+    mutating func openTab(id: UUID = UUID(), navigationPath: [FileBrowserDestination] = []) {
         tabs.append(FilesTabState(id: id, customTitle: nil, navigationPath: navigationPath))
         selectedTabID = id
     }
