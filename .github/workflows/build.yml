@@ -18,6 +18,38 @@ jobs:
           sed -i '' '/RepositoryHomeView/d' ThreeOneOSFive.xcodeproj/project.pbxproj
           sed -i '' '/RepositorySourcesView/d' ThreeOneOSFive.xcodeproj/project.pbxproj
           sed -i '' '/developerModeStorageKey/d' ThreeOneOSFive/views/SettingsView.swift
+          sed -i '' '/$developerModeEnabled/d' ThreeOneOSFive/views/SettingsView.swift
+          python3 - << 'PYEOF'
+          import re, sys
+
+          with open('ThreeOneOSFive.xcodeproj/project.pbxproj', 'r') as f:
+              content = f.read()
+
+          files_to_add = ['AppGridView.swift', 'AppHackDetailView.swift']
+          for fname in files_to_add:
+              if fname in content:
+                  print(f'{fname} already in pbxproj')
+                  continue
+              import uuid
+              ref_id = uuid.uuid4().hex[:24].upper()
+              build_id = uuid.uuid4().hex[:24].upper()
+              file_ref = f'\t\t{ref_id} /* {fname} */ = {{isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = {fname}; sourceTree = "<group>"; }};\n'
+              build_file = f'\t\t{build_id} /* {fname} in Sources */ = {{isa = PBXBuildFile; fileRef = {ref_id} /* {fname} */; }};\n'
+              content = content.replace('/* End PBXFileReference section */', file_ref + '\t\t/* End PBXFileReference section */')
+              content = content.replace('/* End PBXBuildFile section */', build_file + '\t\t/* End PBXBuildFile section */')
+              views_group = re.search(r'path = views;[^}]+\bchildren\b[^(]*\(([^)]*)\)', content, re.DOTALL)
+              if views_group:
+                  insert_pos = views_group.end() - 1
+                  content = content[:insert_pos] + f'\n\t\t\t\t{ref_id} /* {fname} */,' + content[insert_pos:]
+              sources_section = re.search(r'isa = PBXSourcesBuildPhase;[^}]+\bfiles\b[^(]*\(([^)]*)\)', content, re.DOTALL)
+              if sources_section:
+                  insert_pos = sources_section.end() - 1
+                  content = content[:insert_pos] + f'\n\t\t\t\t{build_id} /* {fname} in Sources */,' + content[insert_pos:]
+              print(f'Added {fname} to pbxproj')
+
+          with open('ThreeOneOSFive.xcodeproj/project.pbxproj', 'w') as f:
+              f.write(content)
+          PYEOF
       - name: Build unsigned app
         run: |
           set -e
