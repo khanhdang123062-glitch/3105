@@ -17,36 +17,25 @@ jobs:
         run: |
           set -e
           rm -rf build
-          xcodebuild \
+          xcodebuild archive \
             -project ThreeOneOSFive.xcodeproj \
             -scheme 3105 \
             -configuration Release \
             -sdk iphoneos \
-            -derivedDataPath build/DerivedData \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
+            -archivePath build/3105.xcarchive \
             CODE_SIGN_IDENTITY="" \
-            clean build 2>&1 | tee build.log; grep ": error:" build.log > errors.txt || true; cat errors.txt; grep -q ": error:" build.log && exit 1 || exit 0
-      - name: Upload build log
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-errors
-          path: errors.txt
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            SKIP_INSTALL=NO
       - name: Package IPA
         run: |
           set -e
-          echo "=== Finding .app ==="
-          find build/DerivedData/Build/Products -name "*.app" -type d
-          APP_PATH=$(find build/DerivedData/Build/Products -name "*.app" -type d | head -1)
+          APP_PATH=$(find build/3105.xcarchive/Products/Applications -name "*.app" -type d | head -1)
           echo "Using: $APP_PATH"
-          echo "=== App contents ==="
           ls -la "$APP_PATH"
           rm -rf Payload
           mkdir -p Payload
           cp -R "$APP_PATH" Payload/3105.app
-          echo "=== Payload contents ==="
-          ls -la Payload/3105.app
           /usr/bin/ditto -c -k --sequesterRsrc --keepParent Payload 3105-unsigned.ipa
       - name: Upload IPA
         uses: actions/upload-artifact@v4
