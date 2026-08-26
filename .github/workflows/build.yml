@@ -13,10 +13,11 @@ jobs:
         run: |
           sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
           xcodebuild -version
-      - name: Remove stale file references
+      - name: Fix source files
         run: |
           sed -i '' '/RepositoryHomeView/d' ThreeOneOSFive.xcodeproj/project.pbxproj
           sed -i '' '/RepositorySourcesView/d' ThreeOneOSFive.xcodeproj/project.pbxproj
+          sed -i '' '/developerModeStorageKey/d' ThreeOneOSFive/views/SettingsView.swift
       - name: Build unsigned app
         run: |
           set -e
