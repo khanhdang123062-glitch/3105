@@ -1,18 +1,3 @@
-name: Build 3105 IPA
-on:
-  workflow_dispatch:
-  push:
-    branches: [ main, master ]
-jobs:
-  build:
-    runs-on: macos-15
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Select Xcode
-        run: |
-          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
-          xcodebuild -version
       - name: Build unsigned app
         run: |
           set -e
@@ -26,19 +11,14 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            clean build
-      - name: Package IPA
-        run: |
-          set -e
-          APP_PATH="build/DerivedData/Build/Products/Release-iphoneos/3105.app"
-          test -d "$APP_PATH"
-          rm -rf Payload
-          mkdir -p Payload
-          cp -R "$APP_PATH" Payload/3105.app
-          /usr/bin/ditto -c -k --sequesterRsrc --keepParent Payload 3105-unsigned.ipa
-      - name: Upload IPA
+            clean build 2>&1 | tee build.log; \
+          grep ": error:" build.log > errors.txt || true; \
+          cat errors.txt; \
+          grep -q ": error:" build.log && exit 1 || exit 0
+
+      - name: Upload build log
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: 3105-unsigned-ipa
-          path: 3105-unsigned.ipa
-          if-no-files-found: error
+          name: build-errors
+          path: errors.txt
