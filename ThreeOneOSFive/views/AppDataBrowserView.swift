@@ -14,17 +14,9 @@ struct AppDataBrowserView: View {
     @State private var hasLoaded = false
     @State private var workspaceURL: URL?
     @Binding private var tabSession: FilesTabSession
-    let onOpenSettings: () -> Void
-    let onOpenLogs: () -> Void
 
-    init(
-        tabSession: Binding<FilesTabSession>,
-        onOpenSettings: @escaping () -> Void = {},
-        onOpenLogs: @escaping () -> Void = {}
-    ) {
+    init(tabSession: Binding<FilesTabSession>) {
         _tabSession = tabSession
-        self.onOpenSettings = onOpenSettings
-        self.onOpenLogs = onOpenLogs
     }
 
     private var filteredApps: [InstalledApp] {
@@ -47,12 +39,7 @@ struct AppDataBrowserView: View {
     }
 
     var body: some View {
-        navigationContent(tabID: tabSession.selectedTabID)
-            .id(tabSession.selectedTabID)
-    }
-
-    private func navigationContent(tabID: UUID) -> some View {
-        NavigationStack(path: navigationPath(for: tabID)) {
+        NavigationStack(path: activeNavigationPath) {
             appList
             .navigationTitle(language.text("browser.title"))
             .navigationBarTitleDisplayMode(.inline)
@@ -71,11 +58,6 @@ struct AppDataBrowserView: View {
                     .disabled(isResolving)
                     .accessibilityLabel(language.text("browser.retry"))
                 }
-                AppUtilityToolbar(
-                    language: language,
-                    onOpenSettings: onOpenSettings,
-                    onOpenLogs: onOpenLogs
-                )
             }
             .onAppear {
                 if workspaceURL == nil {
@@ -108,10 +90,10 @@ struct AppDataBrowserView: View {
         }
     }
 
-    private func navigationPath(for tabID: UUID) -> Binding<[FileBrowserDestination]> {
+    private var activeNavigationPath: Binding<[FileBrowserDestination]> {
         Binding(
-            get: { tabSession.navigationPath(for: tabID) },
-            set: { tabSession.setNavigationPath($0, for: tabID) }
+            get: { tabSession.activeTab?.navigationPath ?? [] },
+            set: { tabSession.setActiveNavigationPath($0) }
         )
     }
 
