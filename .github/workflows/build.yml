@@ -30,7 +30,13 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
-            SKIP_INSTALL=NO
+            SKIP_INSTALL=NO 2>&1 | tee build.log; grep ": error:" build.log > errors.txt || true; cat errors.txt; grep -q ": error:" build.log && exit 1 || exit 0
+      - name: Upload errors
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-errors
+          path: errors.txt
       - name: Package IPA
         run: |
           set -e
