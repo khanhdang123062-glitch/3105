@@ -81,8 +81,9 @@ struct AppGridView: View {
     private func makeFallback(_ info: HardcodedApp) -> InstalledApp {
         InstalledApp(
             bundleID: info.bundleID,
-            displayName: info.displayName,
+            name: info.displayName,
             containerPath: "",
+            version: "",
             icon: nil
         )
     }
