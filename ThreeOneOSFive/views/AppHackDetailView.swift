@@ -2,6 +2,11 @@ import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
 
+private enum PatchPickerPolicy {
+    static let packageType = UTType(filenameExtension: "3105") ?? .data
+    static let allowedContentTypes: [UTType] = [packageType, .data]
+}
+
 struct AppHackDetailView: View {
     let app: InstalledApp
     @ObservedObject var patchStore: PatchProjectStore
@@ -12,10 +17,11 @@ struct AppHackDetailView: View {
     @State private var patchError: String?
     @State private var showSuccess = false
     @State private var showImporter = false
+    @State private var lastReceipts: [PatchTransactionReceipt] = []
+    @State private var isRestoring = false
+    @State private var showRestoreSuccess = false
     @State private var importError: String?
     @Environment(\.appLanguage) private var language
-
-    private static let packageType = UTType(filenameExtension: "3105") ?? .data
 
     private var appProjects: [PatchProject] {
         patchStore.items.compactMap(\.project).filter {
@@ -38,6 +44,7 @@ struct AppHackDetailView: View {
                 hackButton
                 if !allRules.isEmpty { menuPatchSection }
                 importButton
+                if !lastReceipts.isEmpty { restoreButton }
                 openAppButton
             }
             .padding(16)
@@ -46,12 +53,20 @@ struct AppHackDetailView: View {
         .navigationTitle(app.displayName)
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { initEnabledRules() }
-        .fileImporter(
-            isPresented: $showImporter,
-            allowedContentTypes: [Self.packageType, .data],
-            allowsMultipleSelection: false
-        ) { result in
-            handleImport(result: result)
+        .sheet(isPresented: $showImporter) {
+            FileDocumentPicker(
+                allowedContentTypes: PatchPickerPolicy.allowedContentTypes,
+                copiesSelectedDocument: true,
+                allowsMultipleSelection: false,
+                onSelection: { result in
+                    showImporter = false
+                    handleImport(result: result)
+                },
+                onCancel: {
+                    showImporter = false
+                }
+            )
+            .ignoresSafeArea()
         }
         .alert(language.text("common.error"), isPresented: Binding(
             get: { patchError != nil },
@@ -70,6 +85,9 @@ struct AppHackDetailView: View {
             Text(importError ?? "")
         }
         .alert("Patch thành công!", isPresented: $showSuccess) {
+            Button(language.text("common.ok"), role: .cancel) {}
+        }
+        .alert("Khôi phục thành công!", isPresented: $showRestoreSuccess) {
             Button(language.text("common.ok"), role: .cancel) {}
         }
     }
@@ -211,6 +229,31 @@ struct AppHackDetailView: View {
         }
     }
 
+    private var restoreButton: some View {
+        Button(action: restoreFiles) {
+            HStack(spacing: 10) {
+                if isRestoring {
+                    ProgressView().tint(.orange)
+                } else {
+                    Image(systemName: "arrow.uturn.backward.circle.fill")
+                        .font(.system(size: 15, weight: .semibold))
+                }
+                Text("Khôi phục file gốc")
+                    .font(.system(size: 16, weight: .semibold))
+            }
+            .foregroundStyle(.orange)
+            .frame(maxWidth: .infinity)
+            .frame(height: 52)
+            .background(Color.orange.opacity(0.12))
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(Color.orange.opacity(0.4), lineWidth: 1)
+            )
+        }
+        .disabled(isRestoring)
+    }
+
     private var openAppButton: some View {
         Button(action: openApp) {
             HStack(spacing: 10) {
@@ -230,6 +273,14 @@ struct AppHackDetailView: View {
     private func initEnabledRules() {
         let newIDs = Set(allRules.map(\.rule.id))
         enabledRules = enabledRules.union(newIDs)
+        loadExistingReceipts()
+    }
+
+    private func loadExistingReceipts() {
+        let receipts = appProjects.compactMap {
+            DevicePatchService.latestReceipt(projectID: $0.id)
+        }
+        lastReceipts = receipts
     }
 
     private func handleImport(result: Result<[URL], Error>) {
@@ -269,10 +320,33 @@ struct AppHackDetailView: View {
                 DispatchQueue.main.async {
                     isPatching = false
                     showSuccess = true
+                    loadExistingReceipts()
                 }
             } catch {
                 DispatchQueue.main.async {
                     isPatching = false
+                    patchError = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    private func restoreFiles() {
+        guard !isRestoring, !lastReceipts.isEmpty else { return }
+        isRestoring = true
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                for receipt in lastReceipts {
+                    try DevicePatchService.restore(receipt: receipt)
+                }
+                DispatchQueue.main.async {
+                    isRestoring = false
+                    showRestoreSuccess = true
+                    lastReceipts = []
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    isRestoring = false
                     patchError = error.localizedDescription
                 }
             }
