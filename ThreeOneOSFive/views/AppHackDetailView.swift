@@ -199,6 +199,14 @@ struct AppHackDetailView: View {
                         ))
                         .labelsHidden()
                         .tint(AppTheme.accent)
+                        Button {
+                            deleteProject(pair.project)
+                        } label: {
+                            Image(systemName: "trash.fill")
+                                .font(.system(size: 14))
+                                .foregroundStyle(.red.opacity(0.8))
+                                .padding(8)
+                        }
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
@@ -328,6 +336,14 @@ struct AppHackDetailView: View {
                     patchError = error.localizedDescription
                 }
             }
+        }
+    }
+
+    private func deleteProject(_ project: PatchProject) {
+        guard let item = patchStore.items.first(where: { $0.id == project.id }) else { return }
+        patchStore.delete(item)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            initEnabledRules()
         }
     }
 
