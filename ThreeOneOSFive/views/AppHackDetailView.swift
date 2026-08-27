@@ -36,9 +36,7 @@ struct AppHackDetailView: View {
             VStack(spacing: 16) {
                 appHeader
                 hackButton
-                if !allRules.isEmpty {
-                    menuPatchSection
-                }
+                if !allRules.isEmpty { menuPatchSection }
                 importButton
                 openAppButton
             }
@@ -48,9 +46,6 @@ struct AppHackDetailView: View {
         .navigationTitle(app.displayName)
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { initEnabledRules() }
-        .onChange(of: patchStore.items) { _ in
-            initEnabledRules()
-        }
         .fileImporter(
             isPresented: $showImporter,
             allowedContentTypes: [Self.packageType, .data],
@@ -78,8 +73,6 @@ struct AppHackDetailView: View {
             Button(language.text("common.ok"), role: .cancel) {}
         }
     }
-
-    // MARK: - Header
 
     private var appHeader: some View {
         VStack(spacing: 10) {
@@ -112,8 +105,6 @@ struct AppHackDetailView: View {
         .padding(.top, 8)
     }
 
-    // MARK: - Hack Button
-
     private var hackButton: some View {
         Button(action: applyHack) {
             HStack(spacing: 10) {
@@ -134,8 +125,6 @@ struct AppHackDetailView: View {
         }
         .disabled(isPatching || allRules.isEmpty)
     }
-
-    // MARK: - Menu Patch Section
 
     private var menuPatchSection: some View {
         VStack(spacing: 0) {
@@ -202,8 +191,6 @@ struct AppHackDetailView: View {
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
-    // MARK: - Import Button
-
     private var importButton: some View {
         Button(action: { showImporter = true }) {
             HStack(spacing: 10) {
@@ -224,8 +211,6 @@ struct AppHackDetailView: View {
         }
     }
 
-    // MARK: - Open App Button
-
     private var openAppButton: some View {
         Button(action: openApp) {
             HStack(spacing: 10) {
@@ -242,8 +227,6 @@ struct AppHackDetailView: View {
         }
     }
 
-    // MARK: - Actions
-
     private func initEnabledRules() {
         let newIDs = Set(allRules.map(\.rule.id))
         enabledRules = enabledRules.union(newIDs)
@@ -258,6 +241,9 @@ struct AppHackDetailView: View {
             let accessing = url.startAccessingSecurityScopedResource()
             defer { if accessing { url.stopAccessingSecurityScopedResource() } }
             patchStore.importPackage(at: url)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                initEnabledRules()
+            }
         }
     }
 
@@ -294,9 +280,13 @@ struct AppHackDetailView: View {
     }
 
     private func openApp() {
-        guard let workspace = NSClassFromString("LSApplicationWorkspace")?
-            .perform(Selector(("defaultWorkspace")))?.takeUnretainedValue() as AnyObject?,
-              let bundleID = app.bundleID as AnyObject? else { return }
-        _ = workspace.perform(Selector(("openApplicationWithBundleID:")), with: bundleID)
+        let workspaceSel = NSSelectorFromString("defaultWorkspace")
+        guard let cls = NSClassFromString("LSApplicationWorkspace") as? NSObject.Type,
+              cls.responds(to: workspaceSel),
+              let workspace = cls.perform(workspaceSel)?.takeUnretainedValue() as? NSObject else { return }
+        let openSel = NSSelectorFromString("openApplicationWithBundleID:")
+        if workspace.responds(to: openSel) {
+            _ = workspace.perform(openSel, with: app.bundleID)
+        }
     }
 }
