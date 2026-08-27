@@ -13,28 +13,17 @@ jobs:
         run: |
           sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
           xcodebuild -version
-      - name: Fix source files
+      - name: Fix project
         run: |
           sed -i '' '/RepositoryHomeView/d' ThreeOneOSFive.xcodeproj/project.pbxproj
           sed -i '' '/RepositorySourcesView/d' ThreeOneOSFive.xcodeproj/project.pbxproj
-          sed -i '' '/developerModeStorageKey/d' ThreeOneOSFive/views/SettingsView.swift
-          sed -i '' '/$developerModeEnabled/d' ThreeOneOSFive/views/SettingsView.swift
           python3 .github/scripts/fix_pbxproj.py
-      - name: Build unsigned app
+      - name: Build
         run: |
           set -o pipefail
           rm -rf build
-          xcodebuild archive \
-            -project ThreeOneOSFive.xcodeproj \
-            -scheme 3105 \
-            -configuration Release \
-            -sdk iphoneos \
-            -archivePath build/3105.xcarchive \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            SKIP_INSTALL=NO 2>&1 | tee build.log
-      - name: Upload build log
+          xcodebuild archive -project ThreeOneOSFive.xcodeproj -scheme 3105 -configuration Release -sdk iphoneos -archivePath build/3105.xcarchive CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO SKIP_INSTALL=NO 2>&1 | tee build.log
+      - name: Upload log
         if: failure()
         uses: actions/upload-artifact@v4
         with:
@@ -43,12 +32,11 @@ jobs:
       - name: Package IPA
         run: |
           set -e
-          APP_PATH=$(find build/3105.xcarchive -name "*.app" -type d | head -1)
-          echo "Found: $APP_PATH"
-          test -n "$APP_PATH"
-          rm -rf Payload
-          mkdir -p Payload
-          cp -R "$APP_PATH" Payload/3105.app
+          APP=$(find build/3105.xcarchive -name "*.app" -type d | head -1)
+          echo "App: $APP"
+          test -n "$APP"
+          rm -rf Payload && mkdir Payload
+          cp -R "$APP" Payload/3105.app
           /usr/bin/ditto -c -k --sequesterRsrc --keepParent Payload 3105-unsigned.ipa
       - name: Upload IPA
         uses: actions/upload-artifact@v4
