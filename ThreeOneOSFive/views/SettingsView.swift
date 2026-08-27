@@ -5,9 +5,6 @@ struct SettingsView: View {
     @Environment(\.appLanguage) private var language
     @EnvironmentObject private var appState: AppState
     @AppStorage(AppLanguage.storageKey) private var languageCode = AppLanguage.english.rawValue
-    @AppStorage(FeatureVisibility.cleanerStorageKey) private var cleanerEnabled = true
-    @AppStorage(FeatureVisibility.developerModeStorageKey)
-    private var developerModeEnabled = false
 
     var body: some View {
         NavigationStack {
@@ -34,41 +31,6 @@ struct SettingsView: View {
                     }
                     .pickerStyle(.segmented)
                     .labelsHidden()
-                }
-
-                Section {
-                    Toggle(isOn: $cleanerEnabled) {
-                        Label(language.text("tab.cleaner"), systemImage: "sparkles")
-                    }
-                    Toggle(isOn: $developerModeEnabled) {
-                        Label(
-                            language.text("settings.developer_mode"),
-                            systemImage: "hammer.fill"
-                        )
-                    }
-                } header: {
-                    Text(language.text("dashboard.features"))
-                } footer: {
-                    Text(language.text("settings.developer_mode_footer"))
-                }
-
-                if WallpaperFeatureSupportPolicy.isSupported(
-                    major: AppInfo.versionTuple.major
-                ) {
-                    Section {
-                        NavigationLink {
-                            WallpaperResetSettingsView()
-                        } label: {
-                            Label(
-                                language.text("wallpaper.reset"),
-                                systemImage: "arrow.counterclockwise"
-                            )
-                        }
-                    } header: {
-                        Text(language.text("tab.wallpapers"))
-                    } footer: {
-                        Text(language.text("wallpaper.reset_settings_footer"))
-                    }
                 }
 
                 Section(language.text("common.device")) {
