@@ -19,40 +19,10 @@ jobs:
           sed -i '' '/RepositorySourcesView/d' ThreeOneOSFive.xcodeproj/project.pbxproj
           sed -i '' '/developerModeStorageKey/d' ThreeOneOSFive/views/SettingsView.swift
           sed -i '' '/$developerModeEnabled/d' ThreeOneOSFive/views/SettingsView.swift
-          python3 - << 'PYEOF'
-          import re, sys
-
-          with open('ThreeOneOSFive.xcodeproj/project.pbxproj', 'r') as f:
-              content = f.read()
-
-          files_to_add = ['AppGridView.swift', 'AppHackDetailView.swift']
-          for fname in files_to_add:
-              if fname in content:
-                  print(f'{fname} already in pbxproj')
-                  continue
-              import uuid
-              ref_id = uuid.uuid4().hex[:24].upper()
-              build_id = uuid.uuid4().hex[:24].upper()
-              file_ref = f'\t\t{ref_id} /* {fname} */ = {{isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = {fname}; sourceTree = "<group>"; }};\n'
-              build_file = f'\t\t{build_id} /* {fname} in Sources */ = {{isa = PBXBuildFile; fileRef = {ref_id} /* {fname} */; }};\n'
-              content = content.replace('/* End PBXFileReference section */', file_ref + '\t\t/* End PBXFileReference section */')
-              content = content.replace('/* End PBXBuildFile section */', build_file + '\t\t/* End PBXBuildFile section */')
-              views_group = re.search(r'path = views;[^}]+\bchildren\b[^(]*\(([^)]*)\)', content, re.DOTALL)
-              if views_group:
-                  insert_pos = views_group.end() - 1
-                  content = content[:insert_pos] + f'\n\t\t\t\t{ref_id} /* {fname} */,' + content[insert_pos:]
-              sources_section = re.search(r'isa = PBXSourcesBuildPhase;[^}]+\bfiles\b[^(]*\(([^)]*)\)', content, re.DOTALL)
-              if sources_section:
-                  insert_pos = sources_section.end() - 1
-                  content = content[:insert_pos] + f'\n\t\t\t\t{build_id} /* {fname} in Sources */,' + content[insert_pos:]
-              print(f'Added {fname} to pbxproj')
-
-          with open('ThreeOneOSFive.xcodeproj/project.pbxproj', 'w') as f:
-              f.write(content)
-          PYEOF
+          python3 .github/scripts/fix_pbxproj.py
       - name: Build unsigned app
         run: |
-          set -e
+          set -o pipefail
           rm -rf build
           xcodebuild archive \
             -project ThreeOneOSFive.xcodeproj \
@@ -63,19 +33,19 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
-            SKIP_INSTALL=NO 2>&1 | tee build.log; grep ": error:" build.log > errors.txt || true; cat errors.txt; grep -q ": error:" build.log && exit 1 || exit 0
-      - name: Upload errors
+            SKIP_INSTALL=NO 2>&1 | tee build.log
+      - name: Upload build log
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: build-errors
-          path: errors.txt
+          name: build-log
+          path: build.log
       - name: Package IPA
         run: |
           set -e
-          APP_PATH=$(find build/3105.xcarchive/Products/Applications -name "*.app" -type d | head -1)
-          echo "Using: $APP_PATH"
-          ls -la "$APP_PATH"
+          APP_PATH=$(find build/3105.xcarchive -name "*.app" -type d | head -1)
+          echo "Found: $APP_PATH"
+          test -n "$APP_PATH"
           rm -rf Payload
           mkdir -p Payload
           cp -R "$APP_PATH" Payload/3105.app
