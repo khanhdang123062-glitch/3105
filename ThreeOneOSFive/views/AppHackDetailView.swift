@@ -90,6 +90,16 @@ struct AppHackDetailView: View {
         .alert("Khôi phục thành công!", isPresented: $showRestoreSuccess) {
             Button(language.text("common.ok"), role: .cancel) {}
         }
+        .sheet(item: $patchStore.passwordRequest, onDismiss: patchStore.cancelUnlock) { _ in
+            PatchUnlockView(store: patchStore)
+        }
+        .alert(item: $patchStore.alert) { alert in
+            Alert(
+                title: Text(language.text(alert.titleKey)),
+                message: Text(alert.message(language: language)),
+                dismissButton: .default(Text(language.text("common.ok")))
+            )
+        }
     }
 
     private var appHeader: some View {
