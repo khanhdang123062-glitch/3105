@@ -20,6 +20,9 @@ struct AppHackDetailView: View {
     @State private var lastReceipts: [PatchTransactionReceipt] = []
     @State private var isRestoring = false
     @State private var showRestoreSuccess = false
+    @State private var showZipImporter = false
+    @State private var zipReceipt: ZipPatchReceipt?
+    @State private var isZipPatching = false
     @State private var importError: String?
     @Environment(\.appLanguage) private var language
 
@@ -44,7 +47,9 @@ struct AppHackDetailView: View {
                 hackButton
                 if !allRules.isEmpty { menuPatchSection }
                 importButton
+                zipImportButton
                 if !lastReceipts.isEmpty { restoreButton }
+                if zipReceipt != nil { restoreZipButton }
                 openAppButton
             }
             .padding(16)
@@ -247,6 +252,51 @@ struct AppHackDetailView: View {
         }
     }
 
+    private var zipImportButton: some View {
+        Button(action: { showZipImporter = true }) {
+            HStack(spacing: 10) {
+                if isZipPatching {
+                    ProgressView().tint(.white)
+                } else {
+                    Image(systemName: "doc.zipper")
+                        .font(.system(size: 15, weight: .semibold))
+                }
+                Text("Import file .zip")
+                    .font(.system(size: 16, weight: .semibold))
+            }
+            .foregroundStyle(AppTheme.accent)
+            .frame(maxWidth: .infinity)
+            .frame(height: 52)
+            .background(AppTheme.accent.opacity(0.12))
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(AppTheme.accent.opacity(0.3), lineWidth: 1)
+            )
+        }
+        .disabled(isZipPatching)
+    }
+
+    private var restoreZipButton: some View {
+        Button(action: restoreZip) {
+            HStack(spacing: 10) {
+                Image(systemName: "arrow.uturn.backward.circle.fill")
+                    .font(.system(size: 15, weight: .semibold))
+                Text("Khôi phục file gốc (Zip)")
+                    .font(.system(size: 16, weight: .semibold))
+            }
+            .foregroundStyle(.orange)
+            .frame(maxWidth: .infinity)
+            .frame(height: 52)
+            .background(Color.orange.opacity(0.12))
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(Color.orange.opacity(0.4), lineWidth: 1)
+            )
+        }
+    }
+
     private var restoreButton: some View {
         Button(action: restoreFiles) {
             HStack(spacing: 10) {
@@ -369,6 +419,53 @@ struct AppHackDetailView: View {
                     isRestoring = false
                     showRestoreSuccess = true
                     lastReceipts = []
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    isRestoring = false
+                    patchError = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    private func handleZipImport(result: Result<[URL], Error>) {
+        switch result {
+        case .failure(let error):
+            patchError = error.localizedDescription
+        case .success(let urls):
+            guard let url = urls.first else { return }
+            let accessing = url.startAccessingSecurityScopedResource()
+            defer { if accessing { url.stopAccessingSecurityScopedResource() } }
+            isZipPatching = true
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    let receipt = try ZipPatchService.apply(zipURL: url, bundleID: app.bundleID)
+                    DispatchQueue.main.async {
+                        zipReceipt = receipt
+                        isZipPatching = false
+                        showSuccess = true
+                    }
+                } catch {
+                    DispatchQueue.main.async {
+                        isZipPatching = false
+                        patchError = error.localizedDescription
+                    }
+                }
+            }
+        }
+    }
+
+    private func restoreZip() {
+        guard let receipt = zipReceipt else { return }
+        isRestoring = true
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                try ZipPatchService.restore(receipt: receipt)
+                DispatchQueue.main.async {
+                    zipReceipt = nil
+                    isRestoring = false
+                    showRestoreSuccess = true
                 }
             } catch {
                 DispatchQueue.main.async {
