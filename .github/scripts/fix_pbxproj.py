@@ -1,12 +1,15 @@
-import re, uuid, sys
+import re, uuid
 
 with open('ThreeOneOSFive.xcodeproj/project.pbxproj', 'r') as f:
     content = f.read()
 
-for fname in ['AppGridView.swift', 'AppHackDetailView.swift']:
+view_files = ['AppGridView.swift', 'AppHackDetailView.swift']
+helper_files = ['ZipPatchService.swift']
+
+def add_file(content, fname, group_keyword):
     if fname in content:
         print(f'{fname} already registered')
-        continue
+        return content
     ref_id = uuid.uuid4().hex[:24].upper()
     build_id = uuid.uuid4().hex[:24].upper()
     content = content.replace(
@@ -17,7 +20,7 @@ for fname in ['AppGridView.swift', 'AppHackDetailView.swift']:
         '/* End PBXBuildFile section */',
         f'\t\t{build_id} /* {fname} in Sources */ = {{isa = PBXBuildFile; fileRef = {ref_id} /* {fname} */; }};\n\t\t/* End PBXBuildFile section */'
     )
-    m = re.search(r'path = views;\s*sourceTree[^;]+;\s*\};', content)
+    m = re.search(rf'path = {group_keyword};\s*sourceTree[^;]+;\s*\}};', content)
     if m:
         insert = content.rfind('children', 0, m.start())
         paren = content.find('(', insert)
@@ -27,6 +30,13 @@ for fname in ['AppGridView.swift', 'AppHackDetailView.swift']:
         pos = m2.end()
         content = content[:pos] + f'\n\t\t\t\t{build_id} /* {fname} in Sources */,' + content[pos:]
     print(f'Added {fname}')
+    return content
+
+for fname in view_files:
+    content = add_file(content, fname, 'views')
+
+for fname in helper_files:
+    content = add_file(content, fname, 'helpers')
 
 with open('ThreeOneOSFive.xcodeproj/project.pbxproj', 'w') as f:
     f.write(content)
