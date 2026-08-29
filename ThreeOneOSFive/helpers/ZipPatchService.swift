@@ -11,7 +11,7 @@ enum ZipPatchError: LocalizedError {
     case containerNotFound(String)
     case extractionFailed
     case noFilesPatched
-    case destinationNotFound
+    case resourcesFolderNotFound
 
     var errorDescription: String? {
         switch self {
@@ -20,9 +20,9 @@ enum ZipPatchError: LocalizedError {
         case .extractionFailed:
             return "Giải nén file zip thất bại."
         case .noFilesPatched:
-            return "Không có file nào được patch — kiểm tra lại cấu trúc zip."
-        case .destinationNotFound:
-            return "Không tìm thấy thư mục đích trong container game."
+            return "Không có file nào được patch."
+        case .resourcesFolderNotFound:
+            return "Không tìm thấy folder Resources trong zip hoặc trong game."
         }
     }
 }
@@ -36,44 +36,46 @@ enum ZipPatchService {
         return dir
     }()
 
-    // Tìm base path trong container — ưu tiên Documents, fallback về root
-    private static func resolveBasePath(
-        containerURL: URL,
-        zipTopFolder: String
-    ) -> URL {
+    // Tìm folder "Resources" bên trong thư mục đã extract (bất kể nằm ở cấp nào)
+    private static func findResourcesFolder(in dir: URL) -> URL? {
         let fm = FileManager.default
-        // Thử Documents/topFolder
-        let docsFolder = containerURL
-            .appendingPathComponent("Documents")
-            .appendingPathComponent(zipTopFolder)
-        if fm.fileExists(atPath: docsFolder.path) {
-            return containerURL.appendingPathComponent("Documents")
-        }
-        // Thử root/topFolder
-        let rootFolder = containerURL.appendingPathComponent(zipTopFolder)
-        if fm.fileExists(atPath: rootFolder.path) {
-            return containerURL
-        }
-        // Default Documents
-        return containerURL.appendingPathComponent("Documents")
-    }
-
-    // Lấy top-level folder trong zip (vd: "Resources")
-    private static func topFolder(in extractedDir: URL) -> String? {
-        let fm = FileManager.default
-        guard let entries = try? fm.contentsOfDirectory(
-            at: extractedDir,
+        guard let enumerator = fm.enumerator(
+            at: dir,
             includingPropertiesForKeys: [.isDirectoryKey],
             options: [.skipsHiddenFiles]
         ) else { return nil }
-        // Nếu có đúng 1 folder top-level thì đó là prefix
-        let dirs = entries.filter {
-            (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
-        }
-        if dirs.count == 1 {
-            return dirs[0].lastPathComponent
+
+        while let url = enumerator.nextObject() as? URL {
+            guard (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true,
+                  url.lastPathComponent.lowercased() == "resources" else { continue }
+            return url
         }
         return nil
+    }
+
+    // Tìm folder "Resources" trong game container
+    private static func findGameResourcesFolder(containerPath: String) -> URL? {
+        let fm = FileManager.default
+        let containerURL = URL(fileURLWithPath: containerPath)
+
+        // Thử Documents/Resources trước
+        let docsResources = containerURL
+            .appendingPathComponent("Documents")
+            .appendingPathComponent("Resources")
+        if fm.fileExists(atPath: docsResources.path) {
+            return docsResources
+        }
+
+        // Thử root/Resources
+        let rootResources = containerURL.appendingPathComponent("Resources")
+        if fm.fileExists(atPath: rootResources.path) {
+            return rootResources
+        }
+
+        // Fallback: tạo Documents/Resources
+        return containerURL
+            .appendingPathComponent("Documents")
+            .appendingPathComponent("Resources")
     }
 
     static func apply(zipURL: URL, bundleID: String) throws -> ZipPatchReceipt {
@@ -82,9 +84,8 @@ enum ZipPatchService {
         }
 
         let fm = FileManager.default
-        let containerURL = URL(fileURLWithPath: containerPath)
 
-        // Extract zip vào temp
+        // Extract zip
         let tempDir = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try fm.createDirectory(at: tempDir, withIntermediateDirectories: true)
@@ -94,19 +95,23 @@ enum ZipPatchService {
             throw ZipPatchError.extractionFailed
         }
 
-        // Detect top folder trong zip để tìm đúng base path
-        let top = topFolder(in: tempDir) ?? ""
-        let baseURL = resolveBasePath(containerURL: containerURL, zipTopFolder: top)
+        // Tìm folder Resources trong zip đã extract
+        guard let zipResourcesURL = findResourcesFolder(in: tempDir) else {
+            throw ZipPatchError.resourcesFolderNotFound
+        }
 
-        // Tạo backup dir
+        // Tìm folder Resources trong game
+        let gameResourcesURL = findGameResourcesFolder(containerPath: containerPath)!
+
+        // Backup dir
         let backupDir = backupRoot
             .appendingPathComponent(bundleID, isDirectory: true)
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try fm.createDirectory(at: backupDir, withIntermediateDirectories: true)
 
-        // Enumerate từng file trong zip
+        // Enumerate từng file trong Resources của zip
         let enumerator = fm.enumerator(
-            at: tempDir,
+            at: zipResourcesURL,
             includingPropertiesForKeys: [.isRegularFileKey],
             options: [.skipsHiddenFiles]
         )
@@ -114,31 +119,32 @@ enum ZipPatchService {
         var patchedFiles: [String] = []
 
         while let fileURL = enumerator?.nextObject() as? URL {
-            guard let values = try? fileURL.resourceValues(forKeys: [.isRegularFileKey]),
-                  values.isRegularFile == true else { continue }
+            guard (try? fileURL.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
+            else { continue }
 
-            // relativePath từ tempDir: vd "Resources/1.63.1/file.bytes"
-            let relativePath = String(fileURL.path.dropFirst(tempDir.path.count + 1))
-            let destinationURL = baseURL.appendingPathComponent(relativePath)
+            // relativePath tính từ Resources/ trong zip
+            let relativePath = String(fileURL.path.dropFirst(zipResourcesURL.path.count + 1))
+
+            // Đích: game's Resources/relativePath
+            let destinationURL = gameResourcesURL.appendingPathComponent(relativePath)
+
+            // Backup
             let backupURL = backupDir.appendingPathComponent(relativePath)
-
-            // Tạo thư mục đích nếu chưa có
-            try? fm.createDirectory(
-                at: destinationURL.deletingLastPathComponent(),
-                withIntermediateDirectories: true
-            )
             try? fm.createDirectory(
                 at: backupURL.deletingLastPathComponent(),
                 withIntermediateDirectories: true
             )
+            try? fm.createDirectory(
+                at: destinationURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
 
-            // Backup file gốc nếu có
             if fm.fileExists(atPath: destinationURL.path) {
                 try? fm.copyItem(at: destinationURL, to: backupURL)
                 try? fm.removeItem(at: destinationURL)
             }
 
-            // Copy file mới vào
+            // Copy file mới
             try fm.copyItem(at: fileURL, to: destinationURL)
             patchedFiles.append(relativePath)
         }
@@ -159,15 +165,11 @@ enum ZipPatchService {
             throw ZipPatchError.containerNotFound(receipt.bundleID)
         }
 
+        let gameResourcesURL = findGameResourcesFolder(containerPath: containerPath)!
         let fm = FileManager.default
-        let containerURL = URL(fileURLWithPath: containerPath)
-
-        // Detect top folder từ backup để tìm đúng base
-        let top = topFolder(in: receipt.backupDirectory) ?? ""
-        let baseURL = resolveBasePath(containerURL: containerURL, zipTopFolder: top)
 
         for relativePath in receipt.patchedFiles {
-            let destinationURL = baseURL.appendingPathComponent(relativePath)
+            let destinationURL = gameResourcesURL.appendingPathComponent(relativePath)
             let backupURL = receipt.backupDirectory.appendingPathComponent(relativePath)
 
             try? fm.removeItem(at: destinationURL)
