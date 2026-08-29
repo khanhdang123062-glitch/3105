@@ -253,7 +253,11 @@ struct AppHackDetailView: View {
     }
 
     private var zipImportButton: some View {
-        Button(action: { showZipImporter = true }) {
+        Button(action: {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                showZipImporter = true
+            }
+        }) {
             HStack(spacing: 10) {
                 if isZipPatching {
                     ProgressView().tint(.white)
