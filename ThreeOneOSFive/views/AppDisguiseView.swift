@@ -1,43 +1,18 @@
 import SwiftUI
 import UIKit
-
-private struct DisguisePreset: Identifiable {
-    let id: String
-    let name: String
-    let systemIcon: String
-    let color: Color
-}
-
-private let presets: [DisguisePreset] = [
-    DisguisePreset(id: "calculator", name: "Calculator", systemIcon: "function", color: .orange),
-    DisguisePreset(id: "calendar", name: "Calendar", systemIcon: "calendar", color: .red),
-    DisguisePreset(id: "clock", name: "Clock", systemIcon: "clock.fill", color: .black),
-    DisguisePreset(id: "notes", name: "Notes", systemIcon: "note.text", color: .yellow),
-    DisguisePreset(id: "weather", name: "Weather", systemIcon: "cloud.sun.fill", color: .blue),
-    DisguisePreset(id: "settings", name: "Settings", systemIcon: "gearshape.fill", color: .gray),
-    DisguisePreset(id: "maps", name: "Maps", systemIcon: "map.fill", color: .green),
-    DisguisePreset(id: "health", name: "Health", systemIcon: "heart.fill", color: .pink),
-    DisguisePreset(id: "music", name: "Music", systemIcon: "music.note", color: .red),
-    DisguisePreset(id: "photos", name: "Photos", systemIcon: "photo.fill", color: .purple),
-    DisguisePreset(id: "safari", name: "Safari", systemIcon: "safari.fill", color: .blue),
-    DisguisePreset(id: "files", name: "Files", systemIcon: "folder.fill", color: .blue),
-]
+import PhotosUI
 
 struct AppDisguiseView: View {
     let app: InstalledApp
 
     @Environment(\.dismiss) private var dismiss
     @State private var displayName = ""
-    @State private var selectedPreset: DisguisePreset?
+    @State private var selectedPhoto: PhotosPickerItem?
+    @State private var selectedImage: UIImage?
     @State private var isApplying = false
     @State private var errorMessage: String?
     @State private var showSuccess = false
     @State private var showResetConfirm = false
-
-    private let columns = [
-        GridItem(.flexible()), GridItem(.flexible()),
-        GridItem(.flexible()), GridItem(.flexible())
-    ]
 
     var body: some View {
         Form {
@@ -50,39 +25,48 @@ struct AppDisguiseView: View {
                 Text("Tên này sẽ hiện dưới icon \(app.displayName) trên màn hình chính.")
             }
 
-            Section("Chọn icon ngụy trang") {
-                LazyVGrid(columns: columns, spacing: 16) {
-                    ForEach(presets) { preset in
-                        VStack(spacing: 6) {
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                    .fill(preset.color)
-                                    .frame(width: 60, height: 60)
-                                Image(systemName: preset.systemIcon)
-                                    .font(.system(size: 26, weight: .medium))
-                                    .foregroundStyle(.white)
-                            }
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                    .strokeBorder(
-                                        selectedPreset?.id == preset.id
-                                            ? Color.accentColor : Color.clear,
-                                        lineWidth: 3
-                                    )
-                            )
-                            .onTapGesture {
-                                selectedPreset = preset
-                                if displayName.isEmpty {
-                                    displayName = preset.name
-                                }
-                            }
-                            Text(preset.name)
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
+            Section {
+                HStack {
+                    Spacer()
+                    VStack(spacing: 12) {
+                        if let image = selectedImage {
+                            Image(uiImage: image)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 100, height: 100)
+                                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                                .shadow(radius: 4)
+                        } else {
+                            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                                .fill(Color.secondary.opacity(0.2))
+                                .frame(width: 100, height: 100)
+                                .overlay(
+                                    Image(systemName: "photo.badge.plus")
+                                        .font(.system(size: 32))
+                                        .foregroundStyle(.secondary)
+                                )
+                        }
+                        PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                            Text(selectedImage == nil ? "Chọn ảnh" : "Đổi ảnh")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundStyle(AppTheme.accent)
                         }
                     }
+                    Spacer()
                 }
                 .padding(.vertical, 8)
+            } header: {
+                Text("Icon mới")
+            } footer: {
+                Text("Chọn ảnh bất kỳ từ thư viện để làm icon.")
+            }
+            .onChange(of: selectedPhoto) { item in
+                Task {
+                    if let data = try? await item?.loadTransferable(type: Data.self),
+                       let img = UIImage(data: data) {
+                        selectedImage = img
+                    }
+                }
             }
 
             Section {
@@ -101,10 +85,10 @@ struct AppDisguiseView: View {
                     .padding(.vertical, 4)
                 }
                 .listRowBackground(
-                    (displayName.isEmpty || selectedPreset == nil)
+                    (displayName.isEmpty || selectedImage == nil)
                         ? Color.secondary : AppTheme.accent
                 )
-                .disabled(displayName.isEmpty || selectedPreset == nil || isApplying)
+                .disabled(displayName.isEmpty || selectedImage == nil || isApplying)
 
                 if AppDisguiseService.currentConfig(bundleID: app.bundleID) != nil {
                     Button(role: .destructive) {
@@ -127,7 +111,6 @@ struct AppDisguiseView: View {
         .onAppear {
             if let config = AppDisguiseService.currentConfig(bundleID: app.bundleID) {
                 displayName = config.displayName
-                selectedPreset = presets.first { $0.id == config.iconName }
             }
         }
         .alert("Lỗi", isPresented: Binding(
@@ -154,16 +137,15 @@ struct AppDisguiseView: View {
     }
 
     private func applyDisguise() {
-        guard let preset = selectedPreset, !displayName.isEmpty else { return }
+        guard let image = selectedImage, !displayName.isEmpty else { return }
         isApplying = true
-        let iconImage = makeIcon(systemName: preset.systemIcon, color: preset.color)
         DispatchQueue.global(qos: .userInitiated).async {
             do {
                 try AppDisguiseService.apply(
                     bundleID: app.bundleID,
                     displayName: displayName,
-                    iconName: preset.id,
-                    iconImage: iconImage
+                    iconName: "custom",
+                    iconImage: image
                 )
                 DispatchQueue.main.async {
                     isApplying = false
@@ -183,26 +165,7 @@ struct AppDisguiseView: View {
             try? AppDisguiseService.reset(bundleID: app.bundleID)
             DispatchQueue.main.async {
                 displayName = ""
-                selectedPreset = nil
-            }
-        }
-    }
-
-    private func makeIcon(systemName: String, color: Color) -> UIImage {
-        let size = CGSize(width: 180, height: 180)
-        let renderer = UIGraphicsImageRenderer(size: size)
-        return renderer.image { _ in
-            UIColor(color).setFill()
-            UIBezierPath(
-                roundedRect: CGRect(origin: .zero, size: size),
-                cornerRadius: 40
-            ).fill()
-            let config = UIImage.SymbolConfiguration(pointSize: 80, weight: .medium)
-            if let symbol = UIImage(systemName: systemName, withConfiguration: config)?
-                .withTintColor(.white, renderingMode: .alwaysOriginal) {
-                let x = (size.width - symbol.size.width) / 2
-                let y = (size.height - symbol.size.height) / 2
-                symbol.draw(at: CGPoint(x: x, y: y))
+                selectedImage = nil
             }
         }
     }
