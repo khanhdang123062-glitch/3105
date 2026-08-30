@@ -117,10 +117,10 @@ struct AppHackDetailView: View {
         } message: {
             Text(importError ?? "")
         }
-        .alert("Thành công!", isPresented: $showSuccess) {
+        .alert("Đã mod thành công!", isPresented: $showSuccess) {
             Button(language.text("common.ok"), role: .cancel) {}
         }
-        .alert("Khôi phục thành công!", isPresented: $showRestoreSuccess) {
+        .alert("Đã xoá mod!", isPresented: $showRestoreSuccess) {
             Button(language.text("common.ok"), role: .cancel) {}
         }
         .alert(language.text("common.error"), isPresented: Binding(
