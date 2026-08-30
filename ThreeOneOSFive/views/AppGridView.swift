@@ -10,6 +10,10 @@ private struct HardcodedApp {
 private let targetApps: [HardcodedApp] = [
     HardcodedApp(bundleID: "com.garena.game.kgvn", displayName: "Liên Quân Mobile"),
     HardcodedApp(bundleID: "com.dts.freefireth", displayName: "Free Fire"),
+    HardcodedApp(bundleID: "com.dts.freefiremax", displayName: "Free Fire Max"),
+    HardcodedApp(bundleID: "vn.vng.pubgmobile", displayName: "PUBG"),
+    HardcodedApp(bundleID: "com.lemon.lvoverseas", displayName: "Capcut"),
+    HardcodedApp(bundleID: "Dazz.camera.vintagecamera", displayName: "Dazz cam"),
 ]
 
 struct AppGridView: View {
