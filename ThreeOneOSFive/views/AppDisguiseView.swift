@@ -17,9 +17,16 @@ private let presets: [DisguisePreset] = [
     DisguisePreset(id: "settings", name: "Settings", systemIcon: "gearshape.fill", color: .gray),
     DisguisePreset(id: "maps", name: "Maps", systemIcon: "map.fill", color: .green),
     DisguisePreset(id: "health", name: "Health", systemIcon: "heart.fill", color: .pink),
+    DisguisePreset(id: "music", name: "Music", systemIcon: "music.note", color: .red),
+    DisguisePreset(id: "photos", name: "Photos", systemIcon: "photo.fill", color: .purple),
+    DisguisePreset(id: "safari", name: "Safari", systemIcon: "safari.fill", color: .blue),
+    DisguisePreset(id: "files", name: "Files", systemIcon: "folder.fill", color: .blue),
 ]
 
 struct AppDisguiseView: View {
+    let app: InstalledApp
+
+    @Environment(\.dismiss) private var dismiss
     @State private var displayName = ""
     @State private var selectedPreset: DisguisePreset?
     @State private var isApplying = false
@@ -35,12 +42,12 @@ struct AppDisguiseView: View {
     var body: some View {
         Form {
             Section {
-                TextField("Tên hiển thị", text: $displayName)
+                TextField("Tên hiển thị mới", text: $displayName)
                     .autocorrectionDisabled()
             } header: {
                 Text("Tên app")
             } footer: {
-                Text("Tên này sẽ hiện dưới icon trên màn hình chính.")
+                Text("Tên này sẽ hiện dưới icon \(app.displayName) trên màn hình chính.")
             }
 
             Section("Chọn icon ngụy trang") {
@@ -85,7 +92,7 @@ struct AppDisguiseView: View {
                         if isApplying {
                             ProgressView().tint(.white)
                         } else {
-                            Text("Áp dụng ngụy trang")
+                            Text("Áp dụng")
                                 .font(.system(size: 16, weight: .semibold))
                         }
                         Spacer()
@@ -99,7 +106,7 @@ struct AppDisguiseView: View {
                 )
                 .disabled(displayName.isEmpty || selectedPreset == nil || isApplying)
 
-                if AppDisguiseService.currentConfig != nil {
+                if AppDisguiseService.currentConfig(bundleID: app.bundleID) != nil {
                     Button(role: .destructive) {
                         showResetConfirm = true
                     } label: {
@@ -112,13 +119,13 @@ struct AppDisguiseView: View {
                     }
                 }
             } footer: {
-                Text("Sau khi áp dụng, vuốt lên màn hình chính và giữ icon app để thấy thay đổi.")
+                Text("Sau khi áp dụng vuốt lên màn hình chính để thấy thay đổi.")
             }
         }
-        .navigationTitle("Ngụy trang app")
+        .navigationTitle("Ngụy trang \(app.displayName)")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            if let config = AppDisguiseService.currentConfig {
+            if let config = AppDisguiseService.currentConfig(bundleID: app.bundleID) {
                 displayName = config.displayName
                 selectedPreset = presets.first { $0.id == config.iconName }
             }
@@ -132,12 +139,12 @@ struct AppDisguiseView: View {
             Text(errorMessage ?? "")
         }
         .alert("Đã áp dụng!", isPresented: $showSuccess) {
-            Button("OK", role: .cancel) {}
+            Button("OK", role: .cancel) { dismiss() }
         } message: {
-            Text("Tên và icon đã được thay đổi. Vuốt lên màn hình chính để thấy kết quả.")
+            Text("Icon và tên \(app.displayName) đã thay đổi.")
         }
         .confirmationDialog(
-            "Khôi phục về 3105?",
+            "Khôi phục về gốc?",
             isPresented: $showResetConfirm,
             titleVisibility: .visible
         ) {
@@ -153,6 +160,7 @@ struct AppDisguiseView: View {
         DispatchQueue.global(qos: .userInitiated).async {
             do {
                 try AppDisguiseService.apply(
+                    bundleID: app.bundleID,
                     displayName: displayName,
                     iconName: preset.id,
                     iconImage: iconImage
@@ -172,7 +180,7 @@ struct AppDisguiseView: View {
 
     private func resetDisguise() {
         DispatchQueue.global(qos: .userInitiated).async {
-            try? AppDisguiseService.reset()
+            try? AppDisguiseService.reset(bundleID: app.bundleID)
             DispatchQueue.main.async {
                 displayName = ""
                 selectedPreset = nil
