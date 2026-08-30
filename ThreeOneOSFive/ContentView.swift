@@ -237,7 +237,7 @@ private struct DashboardView: View {
                     .accessibilityLabel(language.text("accessibility.open_settings"))
                 }
             }
-            .sheet(isPresented: $showSettings) { SettingsView() }
+            .sheet(isPresented: $showSettings) { NavigationStack { SettingsView() } }
             .sheet(isPresented: $showLogs) { LogView() }
         }
     }
