@@ -32,8 +32,7 @@ struct AppDisguiseView: View {
                            GridItem(.flexible()), GridItem(.flexible())]
 
     var body: some View {
-        NavigationStack {
-            Form {
+        Form {
                 Section {
                     TextField("Tên hiển thị", text: $displayName)
                         .autocorrectionDisabled()
@@ -116,14 +115,9 @@ struct AppDisguiseView: View {
                 } footer: {
                     Text("Sau khi áp dụng, vuốt lên màn hình chính và giữ icon app để thấy thay đổi. Có thể cần khởi động lại SpringBoard.")
                 }
-            }
-            .navigationTitle("Ngụy trang app")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Đóng") { dismiss() }
-                }
-            }
+        }
+        .navigationTitle("Ngụy trang app")
+        .navigationBarTitleDisplayMode(.inline)
             .onAppear {
                 if let config = AppDisguiseService.currentConfig {
                     displayName = config.displayName
