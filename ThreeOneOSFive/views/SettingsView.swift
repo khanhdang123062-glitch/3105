@@ -5,7 +5,6 @@ struct SettingsView: View {
     @Environment(\.appLanguage) private var language
     @EnvironmentObject private var appState: AppState
     @AppStorage(AppLanguage.storageKey) private var languageCode = AppLanguage.english.rawValue
-    @State private var showDisguise = false
 
     var body: some View {
         NavigationStack {
@@ -63,19 +62,6 @@ struct SettingsView: View {
                     Text(language.text("settings.verified_versions"))
                 } footer: {
                     Text(language.text("settings.supported_versions_footer"))
-                }
-
-                Section("Bảo mật") {
-                    Button(action: { showDisguise = true }) {
-                        HStack {
-                            Label("Ngụy trang app", systemImage: "theatermasks.fill")
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .foregroundStyle(.primary)
                 }
 
                 Section(language.text("settings.social_media")) {
