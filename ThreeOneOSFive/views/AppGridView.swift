@@ -10,9 +10,6 @@ private struct HardcodedApp {
 private let targetApps: [HardcodedApp] = [
     HardcodedApp(bundleID: "com.garena.game.kgvn", displayName: "Liên Quân Mobile"),
     HardcodedApp(bundleID: "com.dts.freefireth", displayName: "Free Fire"),
-    HardcodedApp(bundleID: "vn.vng.pubgmobile", displayName: "PUBG"),
-    HardcodedApp(bundleID: "com.lemon.lvoverseas", displayName: "Capcut"),
-    HardcodedApp(bundleID: "Dazz.camera.vintagecamera", displayName: "Dazz cam"),
 ]
 
 struct AppGridView: View {
@@ -130,8 +127,9 @@ private struct AppGridCell: View {
     var body: some View {
         VStack(spacing: 8) {
             Group {
-                if let icon {
-                    Image(uiImage: icon)
+                let resolvedIcon = icon ?? BundledIcons.image(for: bundleID)
+                if let resolvedIcon {
+                    Image(uiImage: resolvedIcon)
                         .resizable()
                         .scaledToFill()
                 } else {
