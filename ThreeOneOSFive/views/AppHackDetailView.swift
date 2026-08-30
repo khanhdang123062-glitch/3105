@@ -60,6 +60,7 @@ struct AppHackDetailView: View {
                 importPatchButton
                 zipImportButton
                 versionSpoofButton
+                disguiseButton
                 if !lastReceipts.isEmpty { restoreButton }
                 if zipReceipt != nil { restoreZipButton }
                 openAppButton
@@ -253,6 +254,27 @@ struct AppHackDetailView: View {
     }
 
     // MARK: - Buttons
+
+    private var disguiseButton: some View {
+        NavigationLink(destination: AppDisguiseView(app: app)) {
+            HStack(spacing: 10) {
+                Image(systemName: "theatermasks.fill")
+                    .font(.system(size: 15, weight: .semibold))
+                Text("Ngụy trang app")
+                    .font(.system(size: 16, weight: .semibold))
+            }
+            .foregroundStyle(AppTheme.accent)
+            .frame(maxWidth: .infinity)
+            .frame(height: 52)
+            .background(AppTheme.accent.opacity(0.12))
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(AppTheme.accent.opacity(0.3), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
 
     private var versionSpoofButton: some View {
         Button(action: { showVersionSpoof = true }) {
