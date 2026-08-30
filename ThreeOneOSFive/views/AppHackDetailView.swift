@@ -32,6 +32,9 @@ struct AppHackDetailView: View {
     @State private var showRestoreSuccess = false
     @State private var zipReceipt: ZipPatchReceipt?
     @State private var isZipPatching = false
+    @State private var showVersionSpoof = false
+    @State private var spoofVersion = ""
+    @State private var isSpoofing = false
     @Environment(\.appLanguage) private var language
 
     private var appProjects: [PatchProject] {
@@ -56,6 +59,7 @@ struct AppHackDetailView: View {
                 if !allRules.isEmpty { menuPatchSection }
                 importPatchButton
                 zipImportButton
+                versionSpoofButton
                 if !lastReceipts.isEmpty { restoreButton }
                 if zipReceipt != nil { restoreZipButton }
                 openAppButton
@@ -100,6 +104,14 @@ struct AppHackDetailView: View {
             if patchStore.passwordRequest != nil {
                 activeSheet = .unlock
             }
+        }
+        .alert("Spoof Version", isPresented: $showVersionSpoof) {
+            TextField("Nhập version mới (vd: 3.45.0)", text: $spoofVersion)
+                .keyboardType(.numbersAndPunctuation)
+            Button("Áp dụng") { applyVersionSpoof() }
+            Button("Huỷ", role: .cancel) { spoofVersion = "" }
+        } message: {
+            Text("Nhập version muốn giả mạo. App Store sẽ nghĩ app đã được update.")
         }
         .alert(language.text("common.error"), isPresented: Binding(
             get: { patchError != nil },
@@ -241,6 +253,31 @@ struct AppHackDetailView: View {
     }
 
     // MARK: - Buttons
+
+    private var versionSpoofButton: some View {
+        Button(action: { showVersionSpoof = true }) {
+            HStack(spacing: 10) {
+                if isSpoofing {
+                    ProgressView().tint(AppTheme.accent)
+                } else {
+                    Image(systemName: "number.circle.fill")
+                        .font(.system(size: 15, weight: .semibold))
+                }
+                Text("Spoof Version")
+                    .font(.system(size: 16, weight: .semibold))
+            }
+            .foregroundStyle(AppTheme.accent)
+            .frame(maxWidth: .infinity)
+            .frame(height: 52)
+            .background(AppTheme.accent.opacity(0.12))
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(AppTheme.accent.opacity(0.3), lineWidth: 1)
+            )
+        }
+        .disabled(isSpoofing)
+    }
 
     private var importPatchButton: some View {
         Button(action: { activeSheet = .importPatch }) {
@@ -452,6 +489,89 @@ struct AppHackDetailView: View {
             } catch {
                 DispatchQueue.main.async {
                     isRestoring = false
+                    patchError = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    private func applyVersionSpoof() {
+        guard !spoofVersion.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        let version = spoofVersion.trimmingCharacters(in: .whitespacesAndNewlines)
+        spoofVersion = ""
+        isSpoofing = true
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                guard let containerPath = ContainerStore.resolveAppContainerPath(bundleID: app.bundleID) else {
+                    throw NSError(domain: "Spoof", code: 0, userInfo: [
+                        NSLocalizedDescriptionKey: "Không tìm thấy container. Exploit chưa active?"
+                    ])
+                }
+
+                // Tìm Info.plist trong bundle của game
+                let containerURL = URL(fileURLWithPath: containerPath)
+                let bundleURL = containerURL
+                    .deletingLastPathComponent()
+                    .deletingLastPathComponent()
+                    .appendingPathComponent("Bundle/Application")
+
+                let fm = FileManager.default
+                guard let bundles = try? fm.contentsOfDirectory(
+                    at: bundleURL,
+                    includingPropertiesForKeys: nil
+                ) else {
+                    throw NSError(domain: "Spoof", code: 1, userInfo: [
+                        NSLocalizedDescriptionKey: "Không tìm thấy bundle của game."
+                    ])
+                }
+
+                var plistURL: URL?
+                for bundle in bundles {
+                    let apps = (try? fm.contentsOfDirectory(at: bundle, includingPropertiesForKeys: nil)) ?? []
+                    for appBundle in apps where appBundle.pathExtension == "app" {
+                        let plist = appBundle.appendingPathComponent("Info.plist")
+                        if fm.fileExists(atPath: plist.path) {
+                            if let dict = NSDictionary(contentsOf: plist) as? [String: Any],
+                               let bundleID = dict["CFBundleIdentifier"] as? String,
+                               bundleID == app.bundleID {
+                                plistURL = plist
+                                break
+                            }
+                        }
+                    }
+                    if plistURL != nil { break }
+                }
+
+                guard let plistURL else {
+                    throw NSError(domain: "Spoof", code: 2, userInfo: [
+                        NSLocalizedDescriptionKey: "Không tìm thấy Info.plist của game."
+                    ])
+                }
+
+                guard var plist = NSDictionary(contentsOf: plistURL) as? [String: Any] else {
+                    throw NSError(domain: "Spoof", code: 3, userInfo: [
+                        NSLocalizedDescriptionKey: "Không đọc được Info.plist."
+                    ])
+                }
+
+                plist["CFBundleShortVersionString"] = version
+                plist["CFBundleVersion"] = version
+
+                let data = try PropertyListSerialization.data(
+                    fromPropertyList: plist,
+                    format: .xml,
+                    options: 0
+                )
+                try data.write(to: plistURL)
+
+                DispatchQueue.main.async {
+                    isSpoofing = false
+                    showSuccess = true
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    isSpoofing = false
                     patchError = error.localizedDescription
                 }
             }
