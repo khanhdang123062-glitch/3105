@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import PhotosUI
 
 private struct HardcodedApp {
     let bundleID: String
@@ -14,17 +15,30 @@ private let targetApps: [HardcodedApp] = [
     HardcodedApp(bundleID: "vn.vng.pubgmobile", displayName: "PUBG"),
     HardcodedApp(bundleID: "com.dts.freefiremax", displayName: "Free Fire Max"),
 ]
+]
 
 struct AppGridView: View {
     @StateObject private var patchStore = PatchProjectStore()
     @State private var appEntries: [(app: InstalledApp?, info: HardcodedApp)] = []
     @State private var isLoading = true
+    @State private var backgroundImage: UIImage? = BackgroundStore.load()
+    @State private var showPhotoPicker = false
+    @State private var photoPickerItem: PhotosPickerItem?
 
     private let columns = [GridItem(.flexible()), GridItem(.flexible())]
 
     var body: some View {
         NavigationStack {
-            Group {
+            ZStack {
+                // Background image
+                if let bg = backgroundImage {
+                    Image(uiImage: bg)
+                        .resizable()
+                        .scaledToFill()
+                        .ignoresSafeArea()
+                        .overlay(Color.black.opacity(0.3))
+                }
+                Group {
                 if isLoading {
                     ProgressView()
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -54,6 +68,23 @@ struct AppGridView: View {
             .navigationTitle("Ứng dụng")
             .navigationBarTitleDisplayMode(.inline)
             .onAppear { loadApps() }
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    PhotosPicker(selection: $photoPickerItem, matching: .images) {
+                        Image(systemName: "photo.on.rectangle")
+                    }
+                }
+            }
+            .onChange(of: photoPickerItem) { item in
+                Task {
+                    if let data = try? await item?.loadTransferable(type: Data.self),
+                       let img = UIImage(data: data) {
+                        backgroundImage = img
+                        BackgroundStore.save(data: data)
+                    }
+                }
+            }
+            } // end ZStack
         }
     }
 
@@ -134,5 +165,23 @@ private struct AppGridCell: View {
         .padding(.vertical, 12)
         .background(Color(.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+}
+
+enum BackgroundStore {
+    private static let key = "appgrid.background"
+    private static let fileURL: URL = {
+        let support = FileManager.default
+            .urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        return support.appendingPathComponent("appgrid_bg.jpg")
+    }()
+
+    static func save(data: Data) {
+        try? data.write(to: fileURL)
+    }
+
+    static func load() -> UIImage? {
+        guard let data = try? Data(contentsOf: fileURL) else { return nil }
+        return UIImage(data: data)
     }
 }
