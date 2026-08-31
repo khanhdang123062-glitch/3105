@@ -51,4 +51,12 @@ jobs:
           path: |
             ThreeOneOSFive/
             ThreeOneOSFive.xcodeproj/
-          if-no-files-found: error
+            .github/
+            docs/
+            CHANGELOG.md
+            LICENSE
+            README.md
+            README.vi.md
+            .gitattributes
+            .gitignore
+          if-no-files-found: warn
