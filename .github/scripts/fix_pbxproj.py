@@ -3,8 +3,8 @@ import re, uuid
 with open('ThreeOneOSFive.xcodeproj/project.pbxproj', 'r') as f:
     content = f.read()
 
-view_files = ['AppGridView.swift', 'AppHackDetailView.swift', 'AppDisguiseView.swift']
-helper_files = ['ZipPatchService.swift', 'BundledIcons.swift', 'AppDisguiseService.swift']
+view_files = ['AppGridView.swift', 'AppHackDetailView.swift']
+helper_files = ['ZipPatchService.swift', 'BundledIcons.swift']
 
 def add_file(content, fname, group_keyword):
     if fname in content:
