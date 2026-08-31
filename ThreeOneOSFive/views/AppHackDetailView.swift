@@ -102,14 +102,6 @@ struct AppHackDetailView: View {
                 activeSheet = .unlock
             }
         }
-        .alert("Spoof Version", isPresented: $showVersionSpoof) {
-            TextField("Nhập version mới (vd: 3.45.0)", text: $spoofVersion)
-                .keyboardType(.numbersAndPunctuation)
-            Button("Áp dụng") { applyVersionSpoof() }
-            Button("Huỷ", role: .cancel) { spoofVersion = "" }
-        } message: {
-            Text("Nhập version muốn giả mạo. App Store sẽ nghĩ app đã được update.")
-        }
         .alert(language.text("common.error"), isPresented: Binding(
             get: { patchError != nil },
             set: { if !$0 { patchError = nil } }
