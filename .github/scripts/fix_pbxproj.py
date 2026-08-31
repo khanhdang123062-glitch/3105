@@ -3,7 +3,7 @@ import re, uuid
 with open('ThreeOneOSFive.xcodeproj/project.pbxproj', 'r') as f:
     content = f.read()
 
-view_files = ['AppGridView.swift', 'AppHackDetailView.swift']
+view_files = ['AppGridView.swift', 'AppHackDetailView.swift', 'GameMenuView.swift']
 helper_files = ['ZipPatchService.swift', 'BundledIcons.swift']
 
 def add_file(content, fname, group_keyword):
