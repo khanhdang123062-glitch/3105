@@ -16,6 +16,11 @@ struct GameMenuView: View {
         let v = UserDefaults.standard.double(forKey: "fov.value")
         return v == 0 ? 50 : v
     }()
+    @State private var offsetNoRecoil = UserDefaults.standard.string(forKey: "offset.norecoil") ?? ""
+    @State private var offsetGhost = UserDefaults.standard.string(forKey: "offset.ghost") ?? ""
+    @State private var offsetSpeed = UserDefaults.standard.string(forKey: "offset.speed") ?? ""
+    @State private var editingOffset: String? = nil
+    @State private var offsetInput = ""
 
     var body: some View {
         ZStack {
@@ -237,11 +242,11 @@ struct GameMenuView: View {
         VStack(spacing: 0) {
             sectionHeader("OTHER")
             VStack(spacing: 0) {
-                lockedRow(index: "A", title: "No Recoil", subtitle: "Cần offset")
+                offsetRow(index: "A", title: "No Recoil", key: "offset.norecoil", value: $offsetNoRecoil)
                 Divider().background(Color.white.opacity(0.08)).padding(.leading, 50)
-                lockedRow(index: "B", title: "Ghost Mode", subtitle: "Cần offset")
+                offsetRow(index: "B", title: "Ghost Mode", key: "offset.ghost", value: $offsetGhost)
                 Divider().background(Color.white.opacity(0.08)).padding(.leading, 50)
-                lockedRow(index: "C", title: "Speed Hack", subtitle: "Cần offset")
+                offsetRow(index: "C", title: "Speed Hack", key: "offset.speed", value: $offsetSpeed)
             }
             .background(Color.white.opacity(0.05))
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -250,31 +255,68 @@ struct GameMenuView: View {
                     .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5)
             )
         }
+        .alert("Nhập offset", isPresented: Binding(
+            get: { editingOffset != nil },
+            set: { if !$0 { editingOffset = nil } }
+        )) {
+            TextField("0x00000000", text: $offsetInput)
+                .keyboardType(.asciiCapable)
+                .autocorrectionDisabled()
+            Button("Lưu") {
+                if let key = editingOffset {
+                    UserDefaults.standard.set(offsetInput, forKey: key)
+                    switch key {
+                    case "offset.norecoil": offsetNoRecoil = offsetInput
+                    case "offset.ghost": offsetGhost = offsetInput
+                    case "offset.speed": offsetSpeed = offsetInput
+                    default: break
+                    }
+                }
+                editingOffset = nil
+                offsetInput = ""
+            }
+            Button("Huỷ", role: .cancel) {
+                editingOffset = nil
+                offsetInput = ""
+            }
+        } message: {
+            Text("Nhập hex offset cho chức năng này.")
+        }
     }
 
-    private func lockedRow(index: String, title: String, subtitle: String) -> some View {
+    private func offsetRow(index: String, title: String, key: String, value: Binding<String>) -> some View {
         HStack(spacing: 12) {
             Text(index)
                 .font(.system(size: 13, weight: .bold, design: .monospaced))
-                .foregroundStyle(Color.white.opacity(0.2))
+                .foregroundStyle(value.wrappedValue.isEmpty ? .white.opacity(0.2) : AppTheme.accent)
                 .frame(width: 24)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.3))
-                Text(subtitle)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.white.opacity(0.2))
-                    .kerning(1)
+                    .foregroundStyle(value.wrappedValue.isEmpty ? .white.opacity(0.3) : .white)
+                Text(value.wrappedValue.isEmpty ? "Chưa có offset" : value.wrappedValue)
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(value.wrappedValue.isEmpty ? .white.opacity(0.2) : AppTheme.accent.opacity(0.8))
             }
             Spacer()
-            Image(systemName: "lock.fill")
-                .font(.system(size: 12))
-                .foregroundStyle(.white.opacity(0.2))
+            Button {
+                offsetInput = value.wrappedValue
+                editingOffset = key
+            } label: {
+                Text(value.wrappedValue.isEmpty ? "Nhập" : "Sửa")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(value.wrappedValue.isEmpty ? Color.white.opacity(0.2) : AppTheme.accent)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+            }
+            .buttonStyle(.plain)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
     }
+
 
     private var emptyState: some View {
         VStack(spacing: 10) {
