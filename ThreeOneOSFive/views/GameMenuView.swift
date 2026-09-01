@@ -12,6 +12,10 @@ struct GameMenuView: View {
     @State private var showAssign = false
     @State private var renamingID: Int?
     @State private var renameText = ""
+    @State private var fovValue: Double = {
+        let v = UserDefaults.standard.double(forKey: "fov.value")
+        return v == 0 ? 50 : v
+    }()
 
     var body: some View {
         ZStack {
@@ -114,11 +118,11 @@ struct GameMenuView: View {
 
                             VStack(alignment: .leading, spacing: 2) {
                                 HStack(spacing: 6) {
-                                    Text(preset?.name ?? "Toggle \(id)")
+                                    Text(preset?.name ?? defaultToggleName(id))
                                         .font(.system(size: 15, weight: .medium))
                                         .foregroundStyle(hasFile ? .white : .white.opacity(0.3))
                                     Button {
-                                        renameText = preset?.name ?? "Toggle \(id)"
+                                        renameText = preset?.name ?? defaultToggleName(id)
                                         renamingID = id
                                     } label: {
                                         Image(systemName: "pencil")
@@ -369,6 +373,18 @@ struct GameMenuView: View {
     }
 
     // MARK: - Actions
+
+    // *** ĐỔI TÊN MẶC ĐỊNH TOGGLE Ở ĐÂY ***
+    private func defaultToggleName(_ id: Int) -> String {
+        switch id {
+        case 1: return "Mod Skin"
+        case 2: return "Hack Map"
+        case 3: return "Cam Xa"
+        case 4: return "Toggle 4"
+        case 5: return "Toggle 5"
+        default: return "Toggle \(id)"
+        }
+    }
 
     private func loadPresets() {
         presets = TogglePresetStore.presets(for: app.bundleID)
