@@ -10,6 +10,8 @@ struct GameMenuView: View {
     @State private var patchError: String?
     @State private var showSuccess = false
     @State private var showAssign = false
+    @State private var renamingID: Int?
+    @State private var renameText = ""
 
     var body: some View {
         ZStack {
@@ -34,6 +36,28 @@ struct GameMenuView: View {
         .onAppear { loadPresets() }
         .alert("Đã mod thành công!", isPresented: $showSuccess) {
             Button("OK", role: .cancel) {}
+        }
+        .alert("Đổi tên toggle", isPresented: Binding(
+            get: { renamingID != nil },
+            set: { if !$0 { renamingID = nil } }
+        )) {
+            TextField("Tên mới", text: $renameText)
+            Button("Lưu") {
+                if let id = renamingID, !renameText.isEmpty {
+                    if let idx = presets.firstIndex(where: { $0.id == id }) {
+                        presets[idx].name = renameText
+                        TogglePresetStore.save(presets, for: app.bundleID)
+                    }
+                }
+                renamingID = nil
+                renameText = ""
+            }
+            Button("Huỷ", role: .cancel) {
+                renamingID = nil
+                renameText = ""
+            }
+        } message: {
+            Text("Nhập tên mới cho toggle \(renamingID ?? 0)")
         }
         .alert("Lỗi", isPresented: Binding(
             get: { patchError != nil },
@@ -89,9 +113,20 @@ struct GameMenuView: View {
                                 .frame(width: 24)
 
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(preset?.name ?? "Toggle \(id)")
-                                    .font(.system(size: 15, weight: .medium))
-                                    .foregroundStyle(hasFile ? .white : .white.opacity(0.3))
+                                HStack(spacing: 6) {
+                                    Text(preset?.name ?? "Toggle \(id)")
+                                        .font(.system(size: 15, weight: .medium))
+                                        .foregroundStyle(hasFile ? .white : .white.opacity(0.3))
+                                    Button {
+                                        renameText = preset?.name ?? "Toggle \(id)"
+                                        renamingID = id
+                                    } label: {
+                                        Image(systemName: "pencil")
+                                            .font(.system(size: 11))
+                                            .foregroundStyle(.white.opacity(0.3))
+                                    }
+                                    .buttonStyle(.plain)
+                                }
                                 if let preset {
                                     Text(preset.fileType.uppercased())
                                         .font(.system(size: 10, weight: .semibold))
