@@ -21,6 +21,9 @@ struct GameMenuView: View {
     @State private var offsetSpeed = UserDefaults.standard.string(forKey: "offset.speed") ?? ""
     @State private var editingOffset: String? = nil
     @State private var offsetInput = ""
+    @State private var noRecoilEnabled = false
+    @State private var ghostEnabled = false
+    @State private var speedEnabled = false
 
     var body: some View {
         ZStack {
@@ -242,11 +245,17 @@ struct GameMenuView: View {
         VStack(spacing: 0) {
             sectionHeader("OTHER")
             VStack(spacing: 0) {
-                offsetRow(index: "A", title: "No Recoil", key: "offset.norecoil", value: $offsetNoRecoil)
+                offsetRow(index: "A", title: "No Recoil", key: "offset.norecoil",
+                         value: $offsetNoRecoil, isOn: $noRecoilEnabled,
+                         onToggle: { on in applyOtherPatch(offset: offsetNoRecoil, enable: on) })
                 Divider().background(Color.white.opacity(0.08)).padding(.leading, 50)
-                offsetRow(index: "B", title: "Ghost Mode", key: "offset.ghost", value: $offsetGhost)
+                offsetRow(index: "B", title: "Ghost Mode", key: "offset.ghost",
+                         value: $offsetGhost, isOn: $ghostEnabled,
+                         onToggle: { on in applyOtherPatch(offset: offsetGhost, enable: on) })
                 Divider().background(Color.white.opacity(0.08)).padding(.leading, 50)
-                offsetRow(index: "C", title: "Speed Hack", key: "offset.speed", value: $offsetSpeed)
+                offsetRow(index: "C", title: "Speed Hack", key: "offset.speed",
+                         value: $offsetSpeed, isOn: $speedEnabled,
+                         onToggle: { on in applyOtherPatch(offset: offsetSpeed, enable: on) })
             }
             .background(Color.white.opacity(0.05))
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -284,7 +293,9 @@ struct GameMenuView: View {
         }
     }
 
-    private func offsetRow(index: String, title: String, key: String, value: Binding<String>) -> some View {
+    private func offsetRow(index: String, title: String, key: String,
+                            value: Binding<String>, isOn: Binding<Bool>,
+                            onToggle: @escaping (Bool) -> Void) -> some View {
         HStack(spacing: 12) {
             Text(index)
                 .font(.system(size: 13, weight: .bold, design: .monospaced))
@@ -312,9 +323,37 @@ struct GameMenuView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 6))
             }
             .buttonStyle(.plain)
+            Toggle("", isOn: Binding(
+                get: { isOn.wrappedValue },
+                set: { val in
+                    isOn.wrappedValue = val
+                    onToggle(val)
+                }
+            ))
+            .labelsHidden()
+            .tint(AppTheme.accent)
+            .disabled(value.wrappedValue.isEmpty)
+            .opacity(value.wrappedValue.isEmpty ? 0.3 : 1)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
+    }
+
+    private func applyOtherPatch(offset: String, enable: Bool) {
+        guard !offset.isEmpty else { return }
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                try GameMemoryService.applyBoolPatch(
+                    offset: offset,
+                    value: enable,
+                    bundleID: app.bundleID
+                )
+            } catch {
+                DispatchQueue.main.async {
+                    patchError = error.localizedDescription
+                }
+            }
+        }
     }
 
 
