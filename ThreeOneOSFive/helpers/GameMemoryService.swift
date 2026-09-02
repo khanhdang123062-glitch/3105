@@ -1,6 +1,12 @@
 import Foundation
 import Darwin
 
+@_silgen_name("proc_name")
+func proc_name(_ pid: Int32, _ buf: UnsafeMutablePointer<CChar>, _ bufsize: UInt32) -> Int32
+
+@_silgen_name("proc_listallpids")
+func proc_listallpids(_ buffer: UnsafeMutablePointer<Int32>, _ buffersize: Int32) -> Int32
+
 // Khai báo Mach VM APIs
 @_silgen_name("mach_vm_read_overwrite")
 func mach_vm_read_overwrite(_ target: mach_port_t, _ address: UInt64, _ size: UInt64, _ data: UInt64, _ outsize: UnsafeMutablePointer<UInt64>) -> kern_return_t
@@ -64,10 +70,6 @@ enum GameMemoryService {
 
         // Lấy PID
         var pid: Int32 = 0
-        var nameBuffer = [CChar](repeating: 0, count: 256)
-        _ = proc_name(Int32(truncatingIfNeeded: gameProc), &nameBuffer, 256)
-
-        // Scan PIDs để tìm đúng process
         var allPIDs = [Int32](repeating: 0, count: 1024)
         let count = proc_listallpids(&allPIDs, Int32(allPIDs.count * MemoryLayout<Int32>.size))
         for i in 0..<Int(count) {
