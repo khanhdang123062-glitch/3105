@@ -34,8 +34,7 @@ struct GameMenuView: View {
                 ScrollView {
                     VStack(spacing: 16) {
                         patchSection
-                        if !presets.isEmpty {
-                            otherSection
+                        otherSection
                         }
                     }
                     .padding(16)
