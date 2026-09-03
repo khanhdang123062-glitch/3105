@@ -13,7 +13,7 @@ private let targetApps: [HardcodedApp] = [
     HardcodedApp(bundleID: "com.dts.freefiremax", displayName: "Free Fire Max"),
     HardcodedApp(bundleID: "vn.vng.pubgmobile", displayName: "PUBG Mobile"),
     HardcodedApp(bundleID: "com.lemon.lvoverseas", displayName: "Capcut"),
-    HardcodedApp(bundleID: "dazz.camera.vintagecamera", displayName: "Dazz Cam"),
+    HardcodedApp(bundleID: "Dazz.camera.vintagecamera", displayName: "Dazz Cam"),
 ]
 
 struct AppGridView: View {
