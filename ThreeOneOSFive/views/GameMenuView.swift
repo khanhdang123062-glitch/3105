@@ -24,6 +24,9 @@ struct GameMenuView: View {
     @State private var noRecoilEnabled = false
     @State private var ghostEnabled = false
     @State private var speedEnabled = false
+    @State private var isInjecting = false
+    @State private var injectError: String?
+    @State private var showInjectSuccess = false
 
     private let totalToggles = 5
 
@@ -105,6 +108,19 @@ struct GameMenuView: View {
             }
         } message: {
             Text("Nhập hex offset cho chức năng này.")
+        }
+        .alert("Inject thành công!", isPresented: $showInjectSuccess) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Dylib đã được inject vào game.")
+        }
+        .alert("Inject thất bại", isPresented: Binding(
+            get: { injectError != nil },
+            set: { if !$0 { injectError = nil } }
+        )) {
+            Button("OK", role: .cancel) { injectError = nil }
+        } message: {
+            Text(injectError ?? "")
         }
         .sheet(isPresented: $showAssign, onDismiss: loadPresets) {
             NavigationStack {
@@ -372,11 +388,15 @@ struct GameMenuView: View {
                 }
                 .disabled(isPatching || presets.filter(\.isEnabled).isEmpty)
             }
-            Button(action: openApp) {
+            Button(action: injectAndOpen) {
                 HStack(spacing: 8) {
-                    Image(systemName: "gamecontroller.fill")
-                        .font(.system(size: 15, weight: .semibold))
-                    Text("START")
+                    if isInjecting {
+                        ProgressView().tint(.black).controlSize(.small)
+                    } else {
+                        Image(systemName: "gamecontroller.fill")
+                            .font(.system(size: 15, weight: .semibold))
+                    }
+                    Text(isInjecting ? "ĐANG INJECT..." : "START")
                         .font(.system(size: 17, weight: .bold))
                         .kerning(3)
                 }
@@ -387,6 +407,7 @@ struct GameMenuView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .shadow(color: AppTheme.accent.opacity(0.4), radius: 8, x: 0, y: 3)
             }
+            .disabled(isInjecting)
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 24)
@@ -461,6 +482,52 @@ struct GameMenuView: View {
                 try GameMemoryService.applyBoolPatch(offset: offset, value: enable, bundleID: app.bundleID)
             } catch {
                 DispatchQueue.main.async { patchError = error.localizedDescription }
+            }
+        }
+    }
+
+    private func injectAndOpen() {
+        isInjecting = true
+        let processName = DylibInjector.availableDylibs().isEmpty ? nil : "available"
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            // Tìm dylib trong Documents
+            let dylibs = DylibInjector.availableDylibs()
+
+            if let dylib = dylibs.first {
+                // Tên process từ bundle ID
+                let procName: String
+                switch app.bundleID {
+                case "com.gameversestudio.modern.ops.fps.gun.games":
+                    procName = "ModernOpsFPSGunGames"
+                default:
+                    procName = app.bundleID.components(separatedBy: ".").last ?? app.bundleID
+                }
+
+                do {
+                    try DylibInjector.inject(dylibURL: dylib, into: app.bundleID, processName: procName)
+                    DispatchQueue.main.async {
+                        isInjecting = false
+                        showInjectSuccess = true
+                        // Mở game sau khi inject thành công
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            openApp()
+                        }
+                    }
+                } catch {
+                    DispatchQueue.main.async {
+                        isInjecting = false
+                        injectError = error.localizedDescription
+                        // Vẫn mở game dù inject thất bại
+                        openApp()
+                    }
+                }
+            } else {
+                // Không có dylib — mở game bình thường
+                DispatchQueue.main.async {
+                    isInjecting = false
+                    openApp()
+                }
             }
         }
     }
