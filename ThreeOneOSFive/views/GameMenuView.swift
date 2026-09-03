@@ -27,6 +27,8 @@ struct GameMenuView: View {
     @State private var isInjecting = false
     @State private var injectError: String?
     @State private var showInjectSuccess = false
+    @State private var showDylibPicker = false
+    @State private var dylibName: String? = nil
 
     private let totalToggles = 5
 
@@ -121,6 +123,19 @@ struct GameMenuView: View {
             Button("OK", role: .cancel) { injectError = nil }
         } message: {
             Text(injectError ?? "")
+        }
+        .sheet(isPresented: $showDylibPicker) {
+            FileDocumentPicker(
+                allowedContentTypes: [.data],
+                copiesSelectedDocument: true,
+                allowsMultipleSelection: false,
+                onSelection: { result in
+                    showDylibPicker = false
+                    handleDylibImport(result: result)
+                },
+                onCancel: { showDylibPicker = false }
+            )
+            .ignoresSafeArea()
         }
         .sheet(isPresented: $showAssign, onDismiss: loadPresets) {
             NavigationStack {
@@ -368,6 +383,24 @@ struct GameMenuView: View {
                             .strokeBorder(AppTheme.accent.opacity(0.4), lineWidth: 1)
                     )
                 }
+                Button(action: { showDylibPicker = true }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "chevron.left.forwardslash.chevron.right")
+                            .font(.system(size: 13, weight: .semibold))
+                        Text(dylibName ?? "Import Dylib")
+                            .font(.system(size: 14, weight: .semibold))
+                            .lineLimit(1)
+                    }
+                    .foregroundStyle(dylibName != nil ? .black : AppTheme.accent)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 46)
+                    .background(dylibName != nil ? AppTheme.accent : AppTheme.accent.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .strokeBorder(AppTheme.accent.opacity(0.4), lineWidth: 1)
+                    )
+                }
                 Button(action: applyHack) {
                     HStack(spacing: 6) {
                         if isPatching {
@@ -483,6 +516,21 @@ struct GameMenuView: View {
             } catch {
                 DispatchQueue.main.async { patchError = error.localizedDescription }
             }
+        }
+    }
+
+    private func handleDylibImport(result: Result<[URL], Error>) {
+        switch result {
+        case .failure: break
+        case .success(let urls):
+            guard let url = urls.first else { return }
+            let accessing = url.startAccessingSecurityScopedResource()
+            defer { if accessing { url.stopAccessingSecurityScopedResource() } }
+            let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+            let dest = docs.appendingPathComponent(url.lastPathComponent)
+            try? FileManager.default.removeItem(at: dest)
+            try? FileManager.default.copyItem(at: url, to: dest)
+            dylibName = url.lastPathComponent
         }
     }
 
